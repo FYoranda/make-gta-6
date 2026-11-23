@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Solmar Bay — Open World</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0e1a;
+    font-family: "Segoe UI", Verdana, sans-serif; color: #f2f2f2; }
+  #app { position: fixed; inset: 0; }
+  #app canvas { display: block; width: 100%; height: 100%; }
+  .hidden { display: none !important; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  #hud-top-left { position: absolute; top: 14px; left: 16px; }
+  #cash { font-size: 26px; font-weight: 800; color: #7dff9a; letter-spacing: 1px; }
+  #objective { margin-top: 6px; max-width: 380px; font-size: 14px; line-height: 1.45;
+    background: rgba(8,10,24,.55); border-left: 3px solid #ffcf3f;
+    padding: 8px 10px; border-radius: 0 6px 6px 0; }
+  #objective b { color: #ffcf3f; }
+  #stars { position: absolute; top: 12px; right: 16px; font-size: 30px; letter-spacing: 2px; }
+  #stars .on { color: #ffd23f; }
+  #stars .off { color: rgba(255,255,255,.22); }
+  #toast { position: absolute; top: 84px; left: 50%; transform: translateX(-50%);
+    font-size: 19px; font-weight: 700; color: #ffe9a8; text-align: center;
+    opacity: 0; transition: opacity .3s; }
+  #health-wrap { position: absolute; left: 16px; bottom: 16px; width: 240px; }
+  #health-label { font-size: 12px; letter-spacing: 2px; color: #cfd6ff; margin-bottom: 4px; }
+  #health-bar { height: 14px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.35);
+    border-radius: 7px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg,#37d67a,#a5e635);
+    transition: width .2s; }
+  #ammo { margin-top: 6px; font-size: 15px; font-weight: 700; }
+  #weapon-name { color: #9fd8ff; }
+  #speedo { position: absolute; right: 232px; bottom: 18px; text-align: right; }
+  #speed { font-size: 34px; font-weight: 800; line-height: 1; }
+  #speed small { font-size: 13px; color: #cfd6ff; font-weight: 400; }
+  #car-health { font-size: 13px; color: #ffb3b3; margin-top: 2px; }
+  #minimap { position: absolute; right: 16px; bottom: 16px; width: 200px; height: 200px;
+    border: 2px solid rgba(255,255,255,.55); border-radius: 50%;
+    background: #10182e; box-shadow: 0 0 0 4px rgba(0,0,0,.35); }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+    margin: -11px 0 0 -11px; }
+  #crosshair:before, #crosshair:after { content: ""; position: absolute; background: #fff;
+    box-shadow: 0 0 3px #000; }
+  #crosshair:before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair:after { left: 0; top: 10px; width: 22px; height: 2px; }
+  #interact { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%);
+    font-size: 16px; font-weight: 700; background: rgba(8,10,24,.7);
+    border: 1px solid #ffcf3f; padding: 8px 14px; border-radius: 6px; }
+  #damage { position: fixed; inset: 0; pointer-events: none; z-index: 6; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(255,0,0,.55) 100%); }
+  #wanted-flash { position: fixed; inset: 0; pointer-events: none; z-index: 4; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 70%, rgba(40,80,255,.28) 100%); }
+
+  /* ---------- Overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: linear-gradient(180deg, rgba(10,8,28,.82), rgba(30,10,40,.88)); }
+  .overlay h1 { font-size: 64px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(180deg, #ffe27a, #ff7a3d 60%, #ff2e63);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 4px 24px rgba(255,80,120,.35); }
+  .overlay h2 { font-size: 15px; letter-spacing: 6px; color: #9fd8ff; margin: 6px 0 18px;
+    text-transform: uppercase; }
+  .overlay p { max-width: 560px; font-size: 15px; line-height: 1.6; color: #dfe4ff; margin-bottom: 8px; }
+  .overlay .story { font-style: italic; color: #ffe9a8; }
+  .menu-btn { pointer-events: auto; cursor: pointer; margin-top: 14px; min-width: 260px;
+    font-size: 18px; font-weight: 800; letter-spacing: 1px; color: #1a1030;
+    background: linear-gradient(180deg, #ffe27a, #ffb03d); border: none; border-radius: 8px;
+    padding: 13px 22px; box-shadow: 0 4px 0 #b96a00, 0 8px 24px rgba(0,0,0,.5); }
+  .menu-btn:hover { filter: brightness(1.08); }
+  .menu-btn.ghost { background: rgba(255,255,255,.12); color: #fff;
+    box-shadow: 0 4px 0 rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.4); }
+  .controls { margin-top: 20px; font-size: 13px; color: #b9c2e8; line-height: 1.9;
+    background: rgba(0,0,0,.35); padding: 10px 18px; border-radius: 8px; }
+  .controls b { color: #fff; background: rgba(255,255,255,.16); border-radius: 4px; padding: 1px 7px; }
+  #loading { font-size: 15px; color: #9fd8ff; margin-top: 16px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud" class="hidden">
+  <div id="hud-top-left">
+    <div id="cash">$500</div>
+    <div id="objective"><b>JOB 1 — WHEELS UP</b><br>Steal a car. Any car. Then drive to the yellow marker.</div>
+  </div>
+  <div id="stars"></div>
+  <div id="toast"></div>
+  <div id="health-wrap">
+    <div id="health-label">HEALTH</div>
+    <div id="health-bar"><div id="health-fill"></div></div>
+    <div id="ammo"><span id="weapon-name">PISTOL</span> &nbsp; <span id="ammo-count">12 / ∞</span></div>
+  </div>
+  <div id="speedo">
+    <div id="speed">0 <small>km/h</small></div>
+    <div id="car-health"></div>
+  </div>
+  <canvas id="minimap" width="200" height="200"></canvas>
+  <div id="crosshair" class="hidden"></div>
+  <div id="interact" class="hidden">Press <b>E</b></div>
+</div>
+<div id="damage"></div>
+<div id="wanted-flash"></div>
+
+<div id="menu" class="overlay">
+  <h1>SOLMAR BAY</h1>
+  <h2>An Open-World Crime Game</h2>
+  <p class="story">Jax Marlowe came back to Solmar Bay with $500, a busted knee and a
+  reputation. The city runs on borrowed cars and bad decisions — and tonight,
+  the jobs pay double.</p>
+  <p>Steal cars, outrun the Solmar Bay PD, run five jobs for the crew, and
+  buy your way to the top of the boardwalk.</p>
+  <button id="btn-new" class="menu-btn">NEW GAME</button>
+  <button id="btn-continue" class="menu-btn ghost hidden">CONTINUE</button>
+  <div id="loading">Loading the city…</div>
+  <div class="controls">
+    <b>W A S D</b> move / drive &nbsp; <b>Mouse</b> look &nbsp; <b>Shift</b> run / boost &nbsp;
+    <b>Space</b> jump / handbrake<br>
+    <b>F</b> enter / exit car &nbsp; <b>E</b> interact &nbsp; <b>Click</b> shoot &nbsp;
+    <b>R</b> reload &nbsp; <b>1 2 3</b> weapons &nbsp; <b>Esc</b> pause
+  </div>
+</div>
+
+<div id="pause" class="overlay hidden">
+  <h1>PAUSED</h1>
+  <p>Solmar Bay waits for no one. Except right now.</p>
+  <button id="btn-resume" class="menu-btn">RESUME</button>
+  <button id="btn-quit" class="menu-btn ghost">QUIT TO MENU</button>
+</div>
+
+<div id="busted" class="overlay hidden">
+  <h1>BUSTED</h1>
+  <p>The Solmar Bay PD caught up with you. Bail cost you $250.</p>
+  <button id="btn-busted" class="menu-btn">BACK ON THE STREETS</button>
+</div>
+
+<div id="wasted" class="overlay hidden">
+  <h1>WASTED</h1>
+  <p>Your ride is scrap and so are you. The crew patched you up — minus $250.</p>
+  <button id="btn-wasted" class="menu-btn">BACK ON THE STREETS</button>
+</div>
+
+<div id="complete" class="overlay hidden">
+  <h1>STORY COMPLETE</h1>
+  <p>The Big Score is done. Solmar Bay is yours, Jax. Free roam is open —
+  keep the cash coming.</p>
+  <button id="btn-free" class="menu-btn">KEEP PLAYING</button>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
